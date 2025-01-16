@@ -61,9 +61,11 @@ def set_aws_profile(profile):
 
 # Function to fetch and save parameter store values
 def fetch_parameter_store_values(project_path, environment):
+    env_file_path = os.path.join(project_path, environment, ".env")
     output_file_path = os.path.join(project_path, environment, "fetched_parameters.json")
-    parameters = {}
+    kv_file_path = os.path.join(project_path, environment, "fetched_parameters.env")
 
+    parameters = {}
     print(f"\nFetching parameters for project: {os.path.basename(project_path)}, environment: {environment}\n")
     try:
         # Fetch parameters from AWS SSM Parameter Store
@@ -73,17 +75,19 @@ def fetch_parameter_store_values(project_path, environment):
             capture_output=True, text=True, check=True
         )
         response = json.loads(result.stdout)
-        for param in response.get("Parameters", []):
-            key = param["Name"].split("/")[-1]
-            value = param["Value"]
-            parameters[key] = value
-            print(f"{key}: {value}")
+        with open(kv_file_path, 'w') as kv_file:
+            for param in response.get("Parameters", []):
+                key = param["Name"].split("/")[-1]
+                value = param["Value"]
+                parameters[key] = value
+                kv_file.write(f"{key}={value}\n")
+                print(f"{key}: {value}")
 
-        # Save parameters to file
+        # Save parameters to JSON file
         with open(output_file_path, 'w') as output_file:
             json.dump(parameters, output_file, indent=4)
-        print(f"\nParameters saved to: {output_file_path}")
-        logging.info(f"Parameters saved to: {output_file_path}")
+        print(f"\nParameters saved to: {output_file_path} and {kv_file_path}")
+        logging.info(f"Parameters saved to: {output_file_path} and {kv_file_path}")
     except subprocess.CalledProcessError as e:
         logging.error(f"Error fetching parameters from AWS: {e}")
         print("Error fetching parameters. Ensure AWS CLI is configured correctly and has the necessary permissions.")
